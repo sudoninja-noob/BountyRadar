@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BountyRadar – bug bounty radar for Chrome</title>
+  <meta name="description" content="BountyRadar is a Chrome extension for bug hunters: it tells you if the site you're on runs a bug bounty program, lists its in-scope domains, auto-tracks program pages, and ships 75+ hunting dorks." />
+  <meta property="og:title" content="BountyRadar – bug bounty radar for Chrome" />
+  <meta property="og:description" content="Know instantly if a site runs a bug bounty program – with in-scope domains ready to copy." />
+  <meta property="og:image" content="icons/icon128.png" />
+  <meta name="theme-color" content="#0b1220" />
+  <link rel="icon" type="image/png" href="icons/icon128.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0b1220;
+      --bg-2: #0e1729;
+      --card: rgba(30, 41, 59, 0.6);
+      --border: #22304a;
+      --text: #e2e8f0;
+      --muted: #8ea0b8;
+      --accent: #22c55e;
+      --accent-2: #4ade80;
+      --accent-soft: rgba(34, 197, 94, 0.12);
+      --link: #67e8f9;
+      --radius: 14px;
+      --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background:
+        radial-gradient(900px 500px at 85% -10%, rgba(34, 197, 94, 0.12), transparent 60%),
+        radial-gradient(700px 500px at -10% 30%, rgba(56, 189, 248, 0.07), transparent 60%),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    a { color: var(--link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+
+    /* ---------- nav ---------- */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(11, 18, 32, 0.75);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(34, 48, 74, 0.6);
+    }
+    nav .wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+      gap: 16px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 18px;
+      color: var(--text);
+    }
+    .brand img { width: 32px; height: 32px; border-radius: 8px; }
+    .brand:hover { text-decoration: none; }
+    .nav-links { display: flex; gap: 24px; align-items: center; font-size: 14px; }
+    .nav-links a { color: var(--muted); }
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+
+    /* ---------- buttons ---------- */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 15px;
+      border: 1px solid var(--border);
+      color: var(--text);
+      background: var(--card);
+      transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    }
+    .btn:hover { text-decoration: none; transform: translateY(-1px); border-color: rgba(34, 197, 94, 0.5); }
+    .btn-primary {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      border-color: transparent;
+      color: #04130a;
+      box-shadow: 0 10px 30px rgba(34, 197, 94, 0.25);
+    }
+    .btn-primary:hover { border-color: transparent; }
+    .btn-sm { padding: 8px 14px; font-size: 13px; }
+    .btn svg { width: 18px; height: 18px; }
+
+    /* ---------- hero ---------- */
+    .hero {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 56px;
+      align-items: center;
+      padding: 80px 0 72px;
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      color: #86efac;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+    .pulse {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent-2);
+      box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      70% { box-shadow: 0 0 0 10px rgba(74, 222, 128, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+    }
+    h1 {
+      font-size: clamp(38px, 5.6vw, 62px);
+      line-height: 1.05;
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      text-wrap: balance;
+    }
+    h1 .grad {
+      background: linear-gradient(90deg, #4ade80, #67e8f9);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .lede {
+      margin-top: 20px;
+      font-size: 18px;
+      color: var(--muted);
+      max-width: 540px;
+    }
+    .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+    .stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 28px;
+      margin-top: 40px;
+    }
+    .stat b { display: block; font-size: 26px; font-weight: 800; color: var(--text); }
+    .stat span { font-size: 13px; color: var(--muted); }
+
+    /* popup mock */
+    .mock-wrap { position: relative; display: flex; justify-content: center; }
+    .radar-bg {
+      position: absolute;
+      width: 440px; height: 440px;
+      max-width: 100%;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background:
+        radial-gradient(circle, transparent 29%, rgba(34, 197, 94, 0.12) 29.5%, transparent 30.5%),
+        radial-gradient(circle, transparent 49%, rgba(34, 197, 94, 0.12) 49.5%, transparent 50.5%),
+        radial-gradient(circle, transparent 69%, rgba(34, 197, 94, 0.1) 69.5%, transparent 70.5%);
+      pointer-events: none;
+    }
+    .radar-bg::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, rgba(74, 222, 128, 0.22), transparent 70deg);
+      animation: sweep 5s linear infinite;
+    }
+    @keyframes sweep { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .radar-bg::after, .pulse { animation: none; }
+    }
+
+    .mock {
+      position: relative;
+      width: 360px;
+      max-width: 100%;
+      border-radius: 14px;
+      background: #0b1220;
+      border: 1px solid var(--border);
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.02);
+      overflow: hidden;
+      font-size: 13px;
+    }
+    .mock-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .mock-head .brand { font-size: 15px; }
+    .mock-head .brand img { width: 24px; height: 24px; border-radius: 6px; }
+    .mock-badge {
+      font-size: 11px; font-weight: 700;
+      color: #86efac;
+      background: var(--accent-soft);
+      border: 1px solid rgba(34, 197, 94, 0.4);
+      border-radius: 999px;
+      padding: 2px 9px;
+    }
+    .mock-body { padding: 12px 14px 14px; }
+    .site-card {
+      border-radius: 10px;
+      border: 1px solid rgba(34, 197, 94, 0.55);
+      background: var(--accent-soft);
+      padding: 10px 12px;
+    }
+    .site-top { display: flex; align-items: center; gap: 8px; }
+    .label {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.6px;
+      text-transform: uppercase; color: var(--muted);
+    }
+    .site-top b { flex: 1; }
+    .site-top a { font-size: 12px; }
+    .ok { margin-top: 6px; color: #86efac; font-weight: 600; font-size: 12.5px; }
+    .prog { margin-top: 8px; font-size: 12.5px; color: var(--link); }
+    .tag {
+      display: inline-block;
+      margin-right: 6px;
+      padding: 0 7px;
+      border-radius: 999px;
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #86efac;
+      border: 1px solid rgba(34, 197, 94, 0.45);
+    }
+    .scope-row {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 8px; font-size: 12px;
+    }
+    .scope-row span { color: var(--link); }
+    .copy {
+      font-size: 11px; font-weight: 600;
+      padding: 2px 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--card);
+    }
+    .scope-list {
+      margin-top: 6px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(2, 6, 23, 0.6);
+      color: #bbf7d0;
+      font-family: var(--mono);
+      font-size: 11.5px;
+      line-height: 1.55;
+    }
+    .mock-list { margin-top: 12px; display: grid; gap: 8px; }
+    .mock-item {
+      border: 1px solid var(--border);
+      background: var(--card);
+      border-radius: 10px;
+      padding: 8px 10px;
+    }
+    .mock-item b { display: block; font-size: 12.5px; }
+    .mock-item span { font-size: 11.5px; color: var(--link); }
+
+    /* ---------- sections ---------- */
+    section { padding: 72px 0; }
+    .section-head { max-width: 640px; margin-bottom: 40px; }
+    .kicker {
+      color: var(--accent-2);
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    h2 {
+      margin-top: 8px;
+      font-size: clamp(28px, 3.6vw, 40px);
+      line-height: 1.15;
+      font-weight: 800;
+      letter-spacing: -0.8px;
+      text-wrap: balance;
+    }
+    .section-head p { margin-top: 12px; color: var(--muted); font-size: 17px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .feature {
+      padding: 22px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(30, 41, 59, 0.55), rgba(15, 23, 42, 0.55));
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+    .feature:hover { border-color: rgba(34, 197, 94, 0.45); transform: translateY(-2px); }
+    .icon {
+      width: 40px; height: 40px;
+      display: grid; place-items: center;
+      border-radius: 10px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      color: var(--accent-2);
+      margin-bottom: 14px;
+    }
+    .icon svg { width: 20px; height: 20px; }
+    .feature h3 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+    .feature p { color: var(--muted); font-size: 14.5px; }
+
+    /* how it works */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      counter-reset: step;
+    }
+    .step {
+      position: relative;
+      padding: 22px 20px 20px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg-2);
+    }
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      display: grid; place-items: center;
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #04130a;
+      font-weight: 800;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+    .step h3 { font-size: 16px; margin-bottom: 6px; }
+    .step p { color: var(--muted); font-size: 14px; }
+    code, .mono {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: rgba(2, 6, 23, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 1px 5px;
+      color: #bbf7d0;
+    }
+
+    /* install */
+    .install {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      align-items: start;
+    }
+    ol.install-steps { list-style: none; counter-reset: i; display: grid; gap: 14px; }
+    ol.install-steps li {
+      counter-increment: i;
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--card);
+    }
+    ol.install-steps li::before {
+      content: counter(i);
+      display: grid; place-items: center;
+      width: 30px; height: 30px;
+      border-radius: 8px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      color: var(--accent-2);
+      font-weight: 800;
+      font-size: 14px;
+    }
+    ol.install-steps b { display: block; }
+    ol.install-steps span { color: var(--muted); font-size: 14.5px; }
+    .terminal {
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: #060b16;
+      overflow: hidden;
+    }
+    .terminal-bar {
+      display: flex; gap: 6px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .terminal-bar i { width: 10px; height: 10px; border-radius: 50%; background: #334155; }
+    .terminal pre {
+      padding: 16px 18px;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.7;
+      color: #cbd5e1;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .terminal .c { color: #64748b; }
+    .terminal .g { color: #4ade80; }
+
+    /* privacy */
+    .privacy {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .privacy div {
+      padding: 20px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--card);
+    }
+    .privacy h3 { font-size: 16px; margin-bottom: 6px; }
+    .privacy p { color: var(--muted); font-size: 14px; }
+
+    /* cta band */
+    .band {
+      text-align: center;
+      padding: 56px 24px;
+      border-radius: 20px;
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      background:
+        radial-gradient(600px 200px at 50% 0%, rgba(34, 197, 94, 0.18), transparent 70%),
+        var(--bg-2);
+    }
+    .band img { width: 72px; height: 72px; border-radius: 16px; margin-bottom: 16px; }
+    .band p { color: var(--muted); margin: 10px auto 26px; max-width: 520px; }
+    .band .cta { justify-content: center; margin-top: 0; }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 28px 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    footer a { color: var(--accent-2); font-weight: 600; }
+
+    /* ---------- responsive ---------- */
+    @media (max-width: 960px) {
+      .hero { grid-template-columns: 1fr; gap: 48px; padding-top: 56px; }
+      .grid, .privacy { grid-template-columns: 1fr 1fr; }
+      .steps { grid-template-columns: 1fr 1fr; }
+      .install { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .nav-links a:not(.btn) { display: none; }
+      .grid, .privacy, .steps { grid-template-columns: 1fr; }
+      section { padding: 56px 0; }
+      .radar-bg { width: 340px; height: 340px; }
+      .wrap { padding: 0 16px; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="wrap">
+      <a class="brand" href="#">
+        <img src="icons/icon128.png" alt="" />
+        BountyRadar
+      </a>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a href="#install">Install</a>
+        <a class="btn btn-sm repo-link" href="https://github.com/sudoninja-noob" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2.02c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.56-.29-5.25-1.28-5.25-5.69 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.83 1.19 3.09 0 4.42-2.7 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/></svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <header class="wrap hero">
+    <div>
+      <div class="eyebrow"><span class="pulse"></span> Chrome extension for bug hunters</div>
+      <h1>Know instantly if a site <span class="grad">pays for bugs.</span></h1>
+      <p class="lede">
+        BountyRadar checks every website you visit for a bug bounty or disclosure program,
+        shows its <strong>in-scope domains</strong> ready to copy into your recon tools,
+        and auto-tracks every program page you land on.
+      </p>
+      <div class="cta">
+        <a class="btn btn-primary zip-link" href="https://github.com/sudoninja-noob" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 21h16"/></svg>
+          Download extension
+        </a>
+        <a class="btn" href="#install">Install guide</a>
+      </div>
+      <div class="stats">
+        <div class="stat"><b>1,500+</b><span>public programs indexed</span></div>
+        <div class="stat"><b>16k+</b><span>domains mapped</span></div>
+        <div class="stat"><b>76</b><span>hunting dorks</span></div>
+      </div>
+    </div>
+
+    <div class="mock-wrap" aria-label="Preview of the BountyRadar popup on tesla.com">
+      <div class="radar-bg"></div>
+      <div class="mock">
+        <div class="mock-head">
+          <span class="brand"><img src="icons/icon48.png" alt="" /> BountyRadar</span>
+          <span class="mock-badge">12 programs</span>
+        </div>
+        <div class="mock-body">
+          <div class="site-card">
+            <div class="site-top">
+              <span class="label">This site</span>
+              <b>tesla.com</b>
+              <a>Recheck</a>
+            </div>
+            <div class="ok">✓ This company runs a bug bounty program</div>
+            <div class="prog"><span class="tag">Bugcrowd</span>Tesla</div>
+            <div class="scope-row"><span>In scope (6) ▾</span><span class="copy">Copy</span></div>
+            <div class="scope-list">*.tesla.com<br />*.teslamotors.com<br />*.tesla.cn<br />*.tesla.services<br />*.solarcity.com<br />*.teslainsuranceservices.com</div>
+          </div>
+          <div class="mock-list">
+            <div class="mock-item"><b>Meta Bug Bounty</b><span>https://bugbounty.meta.com/</span></div>
+            <div class="mock-item"><b>GitHub Security Bug Bounty</b><span>https://bounty.github.com/</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section id="features">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="kicker">Features</div>
+        <h2>Everything you need to find your next target</h2>
+        <p>BountyRadar runs quietly while you browse and gives you the answer when you click the icon.</p>
+      </div>
+      <div class="grid">
+        <article class="feature">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 12 18 6"/></svg></div>
+          <h3>Site radar</h3>
+          <p>On any site – <code>facebook.com</code>, <code>tesla.com</code>, <code>github.com</code> – the icon lights up with a green ✓ if the company runs a program.</p>
+        </article>
+        <article class="feature">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg></div>
+          <h3>In-scope domains, one click</h3>
+          <p>Wildcards and hosts from the platform's scope list, one per line – ready for <code>subfinder -dL</code> or <code>httpx -l</code>.</p>
+        </article>
+        <article class="feature">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+          <h3>Auto-tracks program pages</h3>
+          <p>Land on a policy page and it's saved with favicon, title and URL. Recognises Bugcrowd / HackerOne embeds, VDPs and "programme" spellings.</p>
+        </article>
+        <article class="feature">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div>
+          <h3>76 curated dorks</h3>
+          <p>Cleaned-up Google dorks grouped by program URLs, page phrases, platforms, <code>security.txt</code> and country TLDs – one click each.</p>
+        </article>
+        <article class="feature">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div>
+          <h3>Search-result scanning</h3>
+          <p>Optional: open a dork and BountyRadar checks the result pages in the background, adding every program it finds.</p>
+        </article>
+        <article class="feature">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+          <h3>Export to ChatGPT</h3>
+          <p>Send your tracked list to ChatGPT and get back normalized JSON: reward range, platform, in-scope and out-of-scope domains.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="how">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="kicker">How it works</div>
+        <h2>Four checks on every new domain</h2>
+        <p>Results are cached per domain for a week, so revisits are instant. Hit <em>Recheck</em> any time.</p>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <h3>Program directory</h3>
+          <p>1,500+ public programs from ProjectDiscovery, HackerOne, Bugcrowd, Intigriti and YesWeHack – refreshed weekly, searched locally.</p>
+        </div>
+        <div class="step">
+          <h3><code>security.txt</code></h3>
+          <p>Reads <code>/.well-known/security.txt</code> and follows its <code>Policy:</code> and <code>Contact:</code> links.</p>
+        </div>
+        <div class="step">
+          <h3>Security links</h3>
+          <p>Follows footer links like "Security", "Bug Bounty" or "Responsible Disclosure" on the page you're on.</p>
+        </div>
+        <div class="step">
+          <h3>Common paths</h3>
+          <p>Probes <code>/security</code>, <code>/bug-bounty</code>, <code>/responsible-disclosure</code>, <code>/whitehat</code> and friends.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="kicker">Install</div>
+        <h2>Up and running in a minute</h2>
+        <p>BountyRadar loads as an unpacked extension in any recent Chrome (Manifest V3).</p>
+      </div>
+      <div class="install">
+        <ol class="install-steps">
+          <li><div><b>Download the code</b><span>Grab the ZIP from GitHub and unzip it, or clone the repo.</span></div></li>
+          <li><div><b>Open <code>chrome://extensions</code></b><span>Paste it into the address bar.</span></div></li>
+          <li><div><b>Enable Developer mode</b><span>Toggle in the top-right corner.</span></div></li>
+          <li><div><b>Load unpacked</b><span>Select the folder that contains <code>manifest.json</code>.</span></div></li>
+          <li><div><b>Pin it</b><span>Puzzle-piece icon → pin BountyRadar, then visit any site.</span></div></li>
+        </ol>
+        <div class="terminal" aria-label="Clone and copy scope example">
+          <div class="terminal-bar"><i></i><i></i><i></i></div>
+<pre><span class="c"># get the extension</span>
+git clone <span class="repo-text">https://github.com/sudoninja-noob/BountyRadar</span>
+
+<span class="c"># visit tesla.com → click "Copy" under In scope</span>
+<span class="c"># then feed it straight into recon:</span>
+pbpaste | sed 's/^\*\.//' | subfinder -dL - -silent \
+  | httpx -silent -title
+
+<span class="g">✓</span> tesla.com runs a bug bounty program (Bugcrowd)</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="privacy">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="kicker">Privacy</div>
+        <h2>Your browsing stays yours</h2>
+      </div>
+      <div class="privacy">
+        <div>
+          <h3>Local by default</h3>
+          <p>Detection and directory lookups run in your browser. Tracked programs live in <code>chrome.storage.local</code>.</p>
+        </div>
+        <div>
+          <h3>First-party requests only</h3>
+          <p>Site checks request <code>security.txt</code> and program paths from the site you're already on. No third-party favicon or analytics services.</p>
+        </div>
+        <div>
+          <h3>You're in control</h3>
+          <p>Site checks and search-result scanning each have a toggle. Data leaves only when you click Copy or ChatGPT.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="band">
+        <img src="icons/icon128.png" alt="" />
+        <h2>Start hunting smarter</h2>
+        <p>Free and open source. Install BountyRadar and let every site you visit tell you whether it pays for bugs.</p>
+        <div class="cta">
+          <a class="btn btn-primary zip-link" href="https://github.com/sudoninja-noob" target="_blank" rel="noopener">Download extension</a>
+          <a class="btn repo-link" href="https://github.com/sudoninja-noob" target="_blank" rel="noopener">View on GitHub</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">
+      <span>© <span id="year">2026</span> BountyRadar · Use responsibly – only test assets that are in scope.</span>
+      <span>Built by <a href="https://sudoninja-noob.github.io/" target="_blank" rel="noopener">sudoninja-noob</a></span>
+    </div>
+  </footer>
+
+  <script>
+    // On GitHub Pages (user.github.io/repo/) derive the repo + ZIP links
+    // automatically, so the page needs no edits after publishing.
+    (function () {
+      var host = location.hostname;
+      var m = host.match(/^([^.]+)\.github\.io$/i);
+      var repoName = location.pathname.split("/").filter(Boolean)[0];
+      if (!m || !repoName) return;
+      var repo = "https://github.com/" + m[1] + "/" + repoName;
+      var zip = repo + "/archive/refs/heads/main.zip";
+      document.querySelectorAll(".repo-link").forEach(function (a) { a.href = repo; });
+      document.querySelectorAll(".zip-link").forEach(function (a) { a.href = zip; });
+      document.querySelectorAll(".repo-text").forEach(function (el) { el.textContent = repo; });
+    })();
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
