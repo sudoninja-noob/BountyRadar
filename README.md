@@ -2,6 +2,8 @@
 
 <img src="icons/icon128.png" width="96" alt="BountyRadar icon" />
 
+**Website:** https://sudoninja-noob.github.io/BountyRadar/ · **GitHub:** https://github.com/sudoninja-noob/BountyRadar · **Download:** [ZIP](https://github.com/sudoninja-noob/BountyRadar/archive/refs/heads/main.zip)
+
 Built by [sudoninja-noob](https://sudoninja-noob.github.io/)
 
 BountyRadar is a Chrome extension that automatically detects bug bounty programs on the pages you visit. It scans the content of every page, recognizes bounty-related keywords ("bounty", "reward", "monetary compensation", "eligible targets", etc.), and once a page looks like a bug bounty program it saves it to your tracked list with the page's favicon, title, and URL.
@@ -42,7 +44,11 @@ It also lets you send all tracked programs to ChatGPT in one click so you can ge
 ## Installation (load as unpacked extension)
 
 1. **Download the code**
-   - Clone or download this repository into a folder on your computer, e.g. `BountyRadar`.
+   - Clone or download this repository into a folder on your computer, e.g. `BountyRadar`:
+     ```bash
+     git clone https://github.com/sudoninja-noob/BountyRadar.git
+     ```
+     or download the [ZIP](https://github.com/sudoninja-noob/BountyRadar/archive/refs/heads/main.zip) and unzip it.
    - Inside the folder you must see `manifest.json` (this is the extension's "entry point").
 
 2. **Open the Extensions page**
