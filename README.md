@@ -3,7 +3,6 @@
 <img src="icons/icon128.png" width="96" alt="BountyRadar icon" />
 
 **Website:** https://sudoninja-noob.github.io/BountyRadar/ · 
-**Download:** [ZIP](https://github.com/sudoninja-noob/BountyRadar/archive/refs/heads/main.zip)
 
 Built by [sudoninja-noob](https://sudoninja-noob.github.io/)
 
